@@ -173,33 +173,59 @@ class Processor:
         image_hp = (image_hp - image_hp.min()) / (image_hp.max() - image_hp.min() + 1e-8)
 
         return image_hp
+    
+    def compute_fft_image(self, image_tensor: Tensor) -> np.ndarray:
+        image_np = image_tensor.mean(dim=0).cpu().numpy()
+        fft = np.fft.fft2(image_np)
+        fft_shift = np.fft.fftshift(fft)
+        magnitude = np.log(1 + np.abs(fft_shift))
+        return magnitude
 
-    def plot_processing_example(self, original_data_dir: str, texture_dataset: ImageFolder, global_dataset: ImageFolder) -> None:
-        original_dataset = ImageFolder(root=original_data_dir, transform=transforms.ToTensor())
+    def plot_processing_example(self, original_data_dir: str) -> None:
+        original_dataset = ImageFolder(
+            root=original_data_dir,
+            transform=None 
+        )
 
-        random_index = random.randint(a=0, b=len(original_dataset) - 1)
+        index = random.randint(0, len(original_dataset) - 1)
 
-        original_image, original_label = original_dataset[random_index]
-        texture_image, _ = texture_dataset[random_index]
-        global_image, _ = global_dataset[random_index]
+        image_pil, label = original_dataset[index]
 
-        # original_image = self._denormalize_image(original_image)
+        texture_processor = Processor(mode="texture")
+        global_processor = Processor(mode="global")
+
+        texture_image = texture_processor(image_pil)
+        global_image = global_processor(image_pil)
+
         texture_image = self._denormalize_image(texture_image)
         global_image = self._denormalize_image(global_image)
 
-        original_image = original_image.permute(1, 2, 0).cpu().numpy()
-        texture_image = texture_image.permute(1, 2, 0).cpu().numpy()
-        global_image = global_image.permute(1, 2, 0).cpu().numpy()
-        
-        fig, axes = plt.subplots(ncols=3, nrows=1)
-        axes[0].imshow(original_image)
-        axes[1].imshow(texture_image)
-        axes[2].imshow(global_image)
-        axes[0].set_title("Original")
-        axes[1].set_title("Image after texture transformation")
-        axes[2].set_title("Image after global transformation")
+        original_np = np.array(image_pil)
+        texture_np = texture_image.permute(1, 2, 0).cpu().numpy()
+        global_np = global_image.permute(1, 2, 0).cpu().numpy()
 
-        fig.tight_layout()
+        fft_texture = self.compute_fft_image(texture_image)
+        fft_global = self.compute_fft_image(global_image)
+
+        fig, axes = plt.subplots(2, 3, figsize=(12, 6))
+
+        axes[0,0].imshow(original_np)
+        axes[0,1].imshow(texture_np)
+        axes[0,2].imshow(global_np)
+
+        axes[1,1].imshow(fft_texture, cmap='gray')
+        axes[1,2].imshow(fft_global, cmap='gray')
+
+        axes[1,0].axis("off")
+
+        axes[0,0].set_title("Original")
+        axes[0,1].set_title("Texture")
+        axes[0,2].set_title("Global")
+
+        axes[1,1].set_title("FFT Texture")
+        axes[1,2].set_title("FFT Global")
+
+        plt.tight_layout()
         plt.show()
 
 
@@ -207,8 +233,9 @@ class Processor:
 
 
 if __name__ == "__main__":
-    print("Not runnable yet !")
-    # data_dir = "/home/rabah/data/Paysages/seg_train"
+    data_dir = "/home/rabah/data/Paysages/seg_train"
+    processor = Processor(mode="texture")
+    processor.plot_processing_example(original_data_dir=data_dir)
     # processor = Processor(mode="texture")
     # texture_dataset, global_dataset = Processor.create_datasets(data_dir=data_dir)
     # processor.plot_processing_example(original_data_dir=data_dir, texture_dataset=texture_dataset, global_dataset=global_dataset)
