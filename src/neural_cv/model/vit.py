@@ -23,3 +23,6 @@ class ViT(nn.Module):
 
             for param in self.model.heads.parameters():
                 param.requires_grad = True
+
+    def forward(self, x:Tensor):
+        return self.model(x)
