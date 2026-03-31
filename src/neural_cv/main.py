@@ -8,7 +8,7 @@ def main():
     print("Hello from neural-networks-classification!")
 
     data_dir = "/home/rabah/data/Paysages/seg_train"
-    output_dir = "/home/rabah/Projets/neural-networks-classification"
+    output_dir = "/home/rabah/Projets/neural-networks-classification/results"
     batch_size = 32
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -16,7 +16,7 @@ def main():
     builder = DataBuilder(data_dir=data_dir, batch_size=batch_size)
     datasets = builder.build_dataset()
 
-    train_loader = datasets["texture"]["train"]   # 🔥 tu peux changer "texture" → "global"
+    train_loader = datasets["texture"]["train"]   
     val_loader = datasets["texture"]["validation"]
     test_loader = datasets["texture"]["test"]
 

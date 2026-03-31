@@ -17,11 +17,19 @@ class Trainer:
         self.test_loader = test_loader
         self.criterion = CrossEntropyLoss()
 
-        self.optimizer = opt.Adam(params=self.model.parameters(), lr=3e-5)
+        self.optimizer = opt.AdamW(params=self.model.parameters(), lr=3e-5)
         self.num_epochs = num_epochs
         self.device = device
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
+
+        self.history = {
+            "train_loss": [],
+            "val_loss": [],
+            "val_accuracy": [],
+        }
+
+        self.best_val_accuracy = 0.0
 
     
     def train_one_epoch(self) -> float:
@@ -79,26 +87,37 @@ class Trainer:
             train_loss = self.train_one_epoch()
             validation_loss, validation_accuracy = self.evaluate(loader=self.validation_loader)
 
+                        # Tracking
+            self.history["train_loss"].append(train_loss)
+            self.history["val_loss"].append(validation_loss)
+            self.history["val_accuracy"].append(validation_accuracy)
+
             logger.info(f"Epoch : {epoch}")
             logger.info(f"Train Loss : {train_loss}")
             logger.info(f"Validation Loss : {validation_loss} ---- Validation Accuracy : {validation_accuracy}")
 
-        
+            if validation_accuracy > self.best_val_accuracy:
+                self.best_val_accuracy = validation_accuracy
+                torch.save(self.model.state_dict(), self.output_dir / "best_model.pt")
+
+        self.model.load_state_dict(torch.load(self.output_dir / "best_model.pt"))
+
         test_loss, test_accuracy = self.evaluate(loader=self.test_loader)
 
         logger.info(f"Test Loss : {test_loss} ---- Final Test Accuracy : {test_accuracy}")
 
         results = {
             "test_loss": test_loss,
-            "test_accuracy": test_accuracy
+            "test_accuracy": test_accuracy,
+            "history": self.history,
                    }
         
         self.save_results(results=results)
         return test_loss, test_accuracy
     
     def save_results(self, results: dict):
-        with open(self.output_dir, "w") as f:
-            results_json = json.dump(results, f, indent=4)
+        with open(self.output_dir / "results.json" , "w") as f:
+            json.dump(results, f, indent=4)
 
             
 
