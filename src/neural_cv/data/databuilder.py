@@ -2,9 +2,11 @@ from typing import Dict
 import torch
 from torch import Tensor
 from torch.utils.data import DataLoader, Subset
+from loguru import logger
 
 from torchvision.datasets import ImageFolder
 from neural_cv.data.processor import Processor
+import os
 
 
 class DataBuilder:
@@ -18,7 +20,7 @@ class DataBuilder:
         
         self.data_dir = data_dir
         self.batch_size = batch_size
-        self.tran_size = train_size
+        self.train_size = train_size
         self.val_size = val_size
         self.test_size = test_size
         self.seed = seed
@@ -46,6 +48,7 @@ class DataBuilder:
             "texture": self._create_loaders(texture_dataset, train_idx, val_idx, test_idx),
             "global": self._create_loaders(global_dataset, train_idx, val_idx, test_idx)
         }
+        logger.info("DataLoaders texture and global created !")
 
         return dataset_map
 
@@ -56,9 +59,9 @@ class DataBuilder:
         test_dataset = Subset(dataset=dataset, indices=test_idx)
 
         data_loaders_map = {
-            "train": DataLoader(dataset=train_dataset, batch_size=self.batch_size, shuffle=True),
-            "validation": DataLoader(dataset=val_dataset, batch_size=self.batch_size),
-            "test": DataLoader(dataset=test_dataset, batch_size=self.batch_size)
+            "train": DataLoader(dataset=train_dataset, batch_size=self.batch_size, shuffle=True, num_workers= os.cpu_count(), persistent_workers=True),
+            "validation": DataLoader(dataset=val_dataset, batch_size=self.batch_size, num_workers= os.cpu_count(), persistent_workers=True),
+            "test": DataLoader(dataset=test_dataset, batch_size=self.batch_size, num_workers= os.cpu_count(), persistent_workers=True)
         }
         return data_loaders_map
 

@@ -234,7 +234,7 @@ class Processor:
 
 if __name__ == "__main__":
     data_dir = "/home/rabah/data/Paysages/seg_train"
-    processor = Processor(mode="texture")
+    processor = Processor(mode="texture", use_patch_shuffle=True)
     processor.plot_processing_example(original_data_dir=data_dir)
     # processor = Processor(mode="texture")
     # texture_dataset, global_dataset = Processor.create_datasets(data_dir=data_dir)
