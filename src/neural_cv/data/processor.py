@@ -104,7 +104,7 @@ class Processor:
 
         return dataset_texture, dataset_global
     
-    def get_datasets_frequencies(self, datasets: Dict[ImageFolder]) -> Dict[str, float]:
+    def get_datasets_frequencies(self, datasets: Dict[str, ImageFolder]) -> Dict[str, float]:
         results = {}
         for name, dataset in datasets.items():
             dataset_scores = []
