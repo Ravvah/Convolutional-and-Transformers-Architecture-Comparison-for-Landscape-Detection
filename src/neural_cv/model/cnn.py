@@ -22,9 +22,9 @@ class ResNet(nn.Module):
             for param in self.model.parameters():
                 param.requires_grad = False
 
-            for param in self.model.heads.parameters():
+            for param in self.model.fc.parameters():
                 param.requires_grad = True
-                
+
         self.model.fc = nn.Linear(in_features=self.model.fc.in_features, out_features=num_classes)
 
     

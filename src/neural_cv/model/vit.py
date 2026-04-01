@@ -15,7 +15,6 @@ class ViT(nn.Module):
 
 
         in_features = self.model.heads.head.in_features
-        self.model.heads.head = nn.Linear(in_features, num_classes)
 
         if freeze_backbone:
             for param in self.model.parameters():
@@ -23,6 +22,9 @@ class ViT(nn.Module):
 
             for param in self.model.heads.parameters():
                 param.requires_grad = True
+        self.model.heads.head = nn.Linear(in_features, num_classes)
+
+
 
     def forward(self, x:Tensor):
         return self.model(x)
