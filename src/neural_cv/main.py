@@ -54,7 +54,8 @@ def main():
         timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         run_name = f"{timestamp}_seed{seed}_ViT_{mode}"
 
-        output_dir = Path("/home/rabah/Projets/neural-networks-classification/results") /  "cnn" / run_name
+        # output_dir = Path("/home/rabah/Projets/neural-networks-classification/results") /  "cnn" / run_name
+        output_dir = Path("/content/drive/MyDrive/Deep_Learning/Data/results") / "cnn" / run_name
         trainer = Trainer(
             model=model,
             train_loader=train_loader,
