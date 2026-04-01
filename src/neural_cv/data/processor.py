@@ -18,7 +18,8 @@ class Processor:
         use_patch_shuffle: bool = False,
         use_high_pass_filter: bool = False,
         use_local_contrast_normalization: bool = False,
-        use_random_erasing: bool = False
+        use_random_erasing: bool = False,
+        use_random_patch_drop: bool = False
 
     ):
         self.mode = mode
@@ -26,6 +27,7 @@ class Processor:
         self.use_high_pass_filter = use_high_pass_filter
         self.use_local_contrast_normalization = use_local_contrast_normalization
         self.use_random_erasing = use_random_erasing
+        self._use_random_patch_drop = use_random_patch_drop
         self.transforms_list = []
 
         if mode == "texture":
@@ -45,13 +47,13 @@ class Processor:
         elif mode == "global":
             self.transforms_list = [
                 transforms.Resize(256),
-                transforms.CenterCrop(size=224),
-                transforms.Resize(112, interpolation=transforms.InterpolationMode.BILINEAR),
+                transforms.RandomResizedCrop(224, scale=(0.6, 1.0)),
+                transforms.Resize(96, interpolation=transforms.InterpolationMode.BILINEAR),
                 transforms.Resize(224, interpolation=transforms.InterpolationMode.BILINEAR),
-                transforms.GaussianBlur(
-                    kernel_size=11,
-                    sigma=(2.0, 3.0)
-                ),
+                transforms.Grayscale(num_output_channels=3),
+
+                transforms.GaussianBlur(kernel_size=9, sigma=(1.5, 2.0)),
+
                 # transforms.ColorJitter(
                 #     brightness=0.08,
                 #     contrast=0.05,
@@ -94,6 +96,11 @@ class Processor:
                             scale=(0.02, 0.2),
                             ratio=(0.3, 3.3))
             )
+
+        if self._use_random_patch_drop:
+            self.transforms_list.append(
+                transforms.Lambda(lambda x: self.random_patch_drop_single(x))
+                )
 
         self.transforms_list.append(
             transforms.Normalize(
@@ -270,7 +277,19 @@ class Processor:
         out = torch.sign(out) * torch.sqrt(torch.abs(out))
 
         return out
-        
+    def random_patch_drop_single(self, x, drop_prob=0.5, patch_size=24):
+        C, H, W = x.shape
+
+        n_patches_h = H // patch_size
+        n_patches_w = W // patch_size
+
+        for _ in range(int(drop_prob * n_patches_h * n_patches_w)):
+            i = np.random.randint(0, n_patches_h) * patch_size
+            j = np.random.randint(0, n_patches_w) * patch_size
+
+            x[:, i:i+patch_size, j:j+patch_size] = 0
+
+        return x
     # def compute_fft_image(self, image_tensor: Tensor) -> np.ndarray:
     #     image_np = image_tensor.mean(dim=0).cpu().numpy()
     #     fft = np.fft.fft2(image_np)
@@ -303,24 +322,18 @@ class Processor:
                 transforms.Lambda(lambda x: self._high_pass_filter(x, alpha=15.0)),
                 transforms.Lambda(lambda x: self._patch_shuffle_partial(x, patch_size=16, shuffle_ratio=0.45)),
                 transforms.Lambda(lambda x: self.local_contrast_norm_v2(x)),
-                transforms.Lambda(lambda x: x - 0.3 * transforms.GaussianBlur(21, sigma=5.0)(x)),
+                transforms.Lambda(lambda x: x - 0.3 * transforms.GaussianBlur(21, sigma=5.0)(x))
                 ]
                 ),
             "Pipeline_2": transforms.Compose([
-    transforms.Resize((224,224)),
-    transforms.Grayscale(3),
+    transforms.Resize(256),
+    transforms.RandomResizedCrop(224, scale=(0.6, 1.0)),
+    transforms.Resize(96, interpolation=transforms.InterpolationMode.BILINEAR),
+    transforms.Resize(224, interpolation=transforms.InterpolationMode.BILINEAR),
+    transforms.Grayscale(num_output_channels=3),
+    transforms.GaussianBlur(kernel_size=9, sigma=(1.5, 2.0)),
     transforms.ToTensor(),
-
-    # 🔥 texture structurée (band-pass)
-    transforms.Lambda(lambda x: self.texture_boost(x, amount=1.2)),
-
-    # 🔥 energy normalization (clé CNN)
-    transforms.Lambda(lambda x: self.local_texture_energy(x)),
-
-    # 🔥 mélange contrôlé
-    transforms.Lambda(lambda x: 0.6 * x + 0.4 * self.texture_boost(x, amount=1.0)),
-
-    transforms.Lambda(lambda x: torch.clamp(x, 0, 1)),
+    transforms.Lambda(lambda x: self.random_patch_drop_single(x)),
 ])
         }
 

@@ -34,13 +34,13 @@ def main():
         print(f"\n==== RUN WITH SEED {seed} ====")
         set_seed(seed)
 
-        # data_dir = "/content/drive/MyDrive/Deep_Learning/Data/seg_train"
-        data_dir = "/home/rabah/data/Paysages/seg_train"
+        data_dir = "/content/drive/MyDrive/Deep_Learning/Data/seg_train"
+        # data_dir = "/home/rabah/data/Paysages/seg_train"
 
         batch_size = 32
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-        builder = DataBuilder(data_dir=data_dir, batch_size=batch_size, sample_ratio=0.1)
+        builder = DataBuilder(data_dir=data_dir, batch_size=batch_size)
         datasets = builder.build_dataset()
 
         mode = "texture"

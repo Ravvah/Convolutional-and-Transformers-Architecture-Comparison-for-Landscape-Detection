@@ -50,7 +50,7 @@ class DataBuilder:
         test_idx = indices[n_train + n_val:]
 
         texture_dataset = ImageFolder(self.data_dir, transform=Processor(mode="texture", use_local_contrast_normalization=True, use_patch_shuffle=True, use_high_pass_filter=True))
-        global_dataset = ImageFolder(self.data_dir, transform=Processor(mode="global"))
+        global_dataset = ImageFolder(self.data_dir, transform=Processor(mode="global", use_random_patch_drop=True))
 
         dataset_map = {
             "texture": self._create_loaders(texture_dataset, train_idx, val_idx, test_idx),
