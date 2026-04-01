@@ -7,7 +7,8 @@ from loguru import logger
 from torchvision.datasets import ImageFolder
 from neural_cv.data.processor import Processor
 import os
-
+import multiprocessing
+multiprocessing.set_start_method("fork", force=True)
 
 class DataBuilder:
 
