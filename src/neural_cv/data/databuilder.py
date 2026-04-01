@@ -48,7 +48,7 @@ class DataBuilder:
         val_idx = indices[n_train: n_train + n_val]
         test_idx = indices[n_train + n_val:]
 
-        texture_dataset = ImageFolder(self.data_dir, transform=Processor(mode="texture"))
+        texture_dataset = ImageFolder(self.data_dir, transform=Processor(mode="texture", use_local_contrast_normalization=True, use_patch_shuffle=True, use_high_pass_filter=True))
         global_dataset = ImageFolder(self.data_dir, transform=Processor(mode="global"))
 
         dataset_map = {
@@ -57,7 +57,7 @@ class DataBuilder:
         }
 
         logger.info("DataLoaders texture and global created !")
-        
+
         logger.info(f"Total dataset size: {n}")
         logger.info(f"Train size (before sampling): {len(train_idx)}")
         logger.info(f"Validation size (before sampling): {len(val_idx)}")
