@@ -82,7 +82,7 @@ class Processor:
             )
         
         if self.use_local_contrast_normalization:
-            self.transforms_list.append([
+            self.transforms_list.extend([
                 transforms.Lambda(lambda x: self.local_contrast_norm_v2(x)),
                 transforms.Lambda(lambda x: x - 0.3 * transforms.GaussianBlur(21, sigma=5.0)(x))
             ]
