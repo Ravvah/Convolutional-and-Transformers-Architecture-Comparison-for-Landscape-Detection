@@ -3,7 +3,7 @@ from torch import Tensor
 import torch.nn as nn
 import torch.nn.functional as F
 
-from torchvision.models.resnet import resnet152, resnet18
+from torchvision.models.resnet import resnet152, resnet18, resnet34
 from torchvision.models.convnext import convnext_large
 from torchvision.models.detection import fasterrcnn_resnet50_fpn
 
@@ -16,7 +16,7 @@ class ResNet(nn.Module):
     def __init__(self, num_classes: int = 4, freeze_backbone: bool = False):
         super().__init__()
 
-        self.model = resnet18(progress=True, pretrained=True)
+        self.model = resnet34(progress=True, pretrained=True)
 
         if freeze_backbone:
             for param in self.model.parameters():

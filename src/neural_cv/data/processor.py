@@ -19,7 +19,8 @@ class Processor:
         use_high_pass_filter: bool = False,
         use_local_contrast_normalization: bool = False,
         use_random_erasing: bool = False,
-        use_random_patch_drop: bool = False
+        use_random_patch_drop: bool = False,
+        use_local_patch_shuffle: bool = False
 
     ):
         self.mode = mode
@@ -27,7 +28,8 @@ class Processor:
         self.use_high_pass_filter = use_high_pass_filter
         self.use_local_contrast_normalization = use_local_contrast_normalization
         self.use_random_erasing = use_random_erasing
-        self._use_random_patch_drop = use_random_patch_drop
+        self.use_random_patch_drop = use_random_patch_drop
+        self.use_local_patch_shuffle = use_local_patch_shuffle
         self.transforms_list = []
 
         if mode == "texture":
@@ -48,7 +50,7 @@ class Processor:
             self.transforms_list = [
                 transforms.Resize(256),
                 transforms.RandomResizedCrop(224, scale=(0.6, 1.0)),
-                transforms.Resize(96, interpolation=transforms.InterpolationMode.BILINEAR),
+                transforms.Resize(102, interpolation=transforms.InterpolationMode.BILINEAR),
                 transforms.Resize(224, interpolation=transforms.InterpolationMode.BILINEAR),
                 transforms.Grayscale(num_output_channels=3),
 
@@ -80,7 +82,7 @@ class Processor:
 
         if self.use_patch_shuffle:
             self.transforms_list.append(
-                transforms.Lambda(lambda x: self._patch_shuffle_partial(x, patch_size=16, shuffle_ratio=0.45))
+                transforms.Lambda(lambda x: self._global_patch_shuffle_partial(x, patch_size=16, shuffle_ratio=0.45))
             )
         
         if self.use_local_contrast_normalization:
@@ -97,16 +99,22 @@ class Processor:
                             ratio=(0.3, 3.3))
             )
 
-        if self._use_random_patch_drop:
+        if self.use_random_patch_drop:
             self.transforms_list.append(
                 transforms.Lambda(lambda x: self.random_patch_drop_single(x))
                 )
+        if self.use_local_patch_shuffle:
+            self.transforms_list.append(
+                transforms.Lambda(lambda x: self.local_patch_permutation(x, patch_size=8, permute_prob=0.20)),
+
+            )
 
         self.transforms_list.append(
             transforms.Normalize(
                 mean=[0.485, 0.456, 0.406],
                 std=[0.229, 0.224, 0.225]
             )
+    
         )
 
         self.transform = transforms.Compose(self.transforms_list)
@@ -184,7 +192,7 @@ class Processor:
 
         return image
     
-    def _patch_shuffle_partial(self, image: Tensor, patch_size=32, shuffle_ratio=0.6):
+    def _global_patch_shuffle_partial(self, image: Tensor, patch_size=32, shuffle_ratio=0.6):
         C, H, W = image.shape
 
         n_h = H // patch_size
@@ -209,6 +217,23 @@ class Processor:
         image = patches.permute(2, 0, 3, 1, 4).contiguous()
 
         return image.view(C, H, W)
+    
+    def local_patch_permutation(self, x, patch_size=16, permute_prob=0.2):
+        C, H, W = x.shape
+
+        for i in range(0, H, patch_size):
+            for j in range(0, W, patch_size):
+                if np.random.rand() < permute_prob:
+                    i2 = np.random.randint(0, H // patch_size) * patch_size
+                    j2 = np.random.randint(0, W // patch_size) * patch_size
+
+                    patch1 = x[:, i:i+patch_size, j:j+patch_size].clone()
+                    patch2 = x[:, i2:i2+patch_size, j2:j2+patch_size].clone()
+
+                    x[:, i:i+patch_size, j:j+patch_size] = patch2
+                    x[:, i2:i2+patch_size, j2:j2+patch_size] = patch1
+
+        return x
     
     def _high_pass_filter(self, image: Tensor, alpha=0.2) -> Tensor:
         # blur = transforms.GaussianBlur(kernel_size=7, sigma=(0.5, 1.0))(image)
@@ -290,6 +315,23 @@ class Processor:
             x[:, i:i+patch_size, j:j+patch_size] = 0
 
         return x
+    
+    def random_multi_patch_drop_single(self, x, drop_prob=0.35, patch_size=16):
+        C, H, W = x.shape
+        n_h = H // patch_size
+        n_w = W // patch_size
+        n_total = n_h * n_w
+        n_drop = int(drop_prob * n_total)
+
+        coords = [(i, j) for i in range(n_h) for j in range(n_w)]
+        random.shuffle(coords)
+
+        for i, j in coords[:n_drop]:
+            y0 = i * patch_size
+            x0 = j * patch_size
+            x[:, y0:y0+patch_size, x0:x0+patch_size] = 0.0
+
+        return x
     # def compute_fft_image(self, image_tensor: Tensor) -> np.ndarray:
     #     image_np = image_tensor.mean(dim=0).cpu().numpy()
     #     fft = np.fft.fft2(image_np)
@@ -320,7 +362,7 @@ class Processor:
                 transforms.ToTensor(),
                 # transforms.Lambda(lambda x: torch.clamp(x, 0, 1)),
                 transforms.Lambda(lambda x: self._high_pass_filter(x, alpha=15.0)),
-                transforms.Lambda(lambda x: self._patch_shuffle_partial(x, patch_size=16, shuffle_ratio=0.45)),
+                transforms.Lambda(lambda x: self._global_patch_shuffle_partial(x, patch_size=16, shuffle_ratio=0.45)),
                 transforms.Lambda(lambda x: self.local_contrast_norm_v2(x)),
                 transforms.Lambda(lambda x: x - 0.3 * transforms.GaussianBlur(21, sigma=5.0)(x))
                 ]
@@ -328,12 +370,13 @@ class Processor:
             "Pipeline_2": transforms.Compose([
     transforms.Resize(256),
     transforms.RandomResizedCrop(224, scale=(0.6, 1.0)),
-    transforms.Resize(96, interpolation=transforms.InterpolationMode.BILINEAR),
+    transforms.Resize(98, interpolation=transforms.InterpolationMode.BILINEAR),
     transforms.Resize(224, interpolation=transforms.InterpolationMode.BILINEAR),
     transforms.Grayscale(num_output_channels=3),
-    transforms.GaussianBlur(kernel_size=9, sigma=(1.5, 2.0)),
+    transforms.GaussianBlur(kernel_size=7, sigma=(1.5, 2.0)),
     transforms.ToTensor(),
-    transforms.Lambda(lambda x: self.random_patch_drop_single(x)),
+    transforms.Lambda(lambda x: self.local_patch_permutation(x, patch_size=8, permute_prob=0.20)),
+    transforms.Lambda(lambda x: self.random_multi_patch_drop_single(x, drop_prob=0.1, patch_size=8)),
 ])
         }
 
@@ -471,7 +514,7 @@ if __name__ == "__main__":
     processor = Processor(mode="global", use_patch_shuffle=True)
     # processor.plot_processing_example(original_data_dir=data_dir)
     dataset = ImageFolder(data_dir, transform=None)
-    image, _ = dataset[0]
+    image, _ = dataset[501]
 
     processor.plot_deterministic_transformations(image)
 
