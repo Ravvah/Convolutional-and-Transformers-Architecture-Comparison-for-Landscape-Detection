@@ -9,6 +9,9 @@ import timm
 
 
 class ViT(nn.Module):
+    """
+    Class for ViT model
+    """
 
     def __init__(self, num_classes: int = 4, freeze_backbone: bool = False):
         super().__init__()

@@ -12,6 +12,10 @@ from loguru import logger
 import numpy as np
 import random
 
+###########################################################################################################################################
+###################################### MAIN SCRIPT TO RUN PROJECT PIPELINE #######################################################################
+###########################################################################################################################################
+
 
 def set_seed(seed):
     torch.manual_seed(seed)
@@ -34,8 +38,8 @@ def main():
         print(f"\n==== RUN WITH SEED {seed} ====")
         set_seed(seed)
 
-        data_dir = "/content/drive/MyDrive/Deep_Learning/Data/seg_train"
-        # data_dir = "/home/rabah/data/Paysages/seg_train"
+        # data_dir = "/content/drive/MyDrive/Deep_Learning/Data/seg_train"
+        data_dir = "/home/rabah/data/Paysages/seg_train"
 
         batch_size = 32
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -54,8 +58,8 @@ def main():
         timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         run_name = f"{timestamp}_seed{seed}_ViT_{mode}"
 
-        # output_dir = Path("/home/rabah/Projets/neural-networks-classification/results") /  "cnn" / run_name
-        output_dir = Path("/content/drive/MyDrive/Deep_Learning/Data/results") / "cnn" / run_name
+        output_dir = Path("/home/rabah/Projets/neural-networks-classification/results") /  "cnn" / run_name
+        # output_dir = Path("/content/drive/MyDrive/Deep_Learning/Data/results") / "cnn" / run_name
         trainer = Trainer(
             model=model,
             train_loader=train_loader,

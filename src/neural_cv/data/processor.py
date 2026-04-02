@@ -12,6 +12,9 @@ from torchvision.datasets import ImageFolder
 
 
 class Processor:
+    """
+    Class for data tranqsformations
+    """
     def __init__(
         self,
         mode: str,
@@ -32,7 +35,13 @@ class Processor:
         self.use_local_patch_shuffle = use_local_patch_shuffle
         self.transforms_list = []
 
-        if mode == "texture":
+        if mode == "base":
+            self.transforms_list = [
+                transforms.Resize(224),
+                transforms.ToTensor()
+            ]
+
+        elif mode == "texture":
             self.transforms_list = [
                 transforms.Resize(256),
                 transforms.CenterCrop(224),
@@ -71,7 +80,7 @@ class Processor:
 
         if self.use_high_pass_filter:
             self.transforms_list.append(
-                transforms.Lambda(lambda x: self._high_pass_filter(x, alpha=15.0))
+                transforms.Lambda(lambda x: self._high_pass_filter(x, alpha=20.0))
             )
         
         if self.use_local_contrast_normalization:
@@ -82,7 +91,7 @@ class Processor:
 
         if self.use_patch_shuffle:
             self.transforms_list.append(
-                transforms.Lambda(lambda x: self._global_patch_shuffle_partial(x, patch_size=16, shuffle_ratio=0.45))
+                transforms.Lambda(lambda x: self._global_patch_shuffle_partial(x, patch_size=8, shuffle_ratio=0.57))
             )
         
         if self.use_local_contrast_normalization:
@@ -208,7 +217,6 @@ class Processor:
 
         shuffle_indices = torch.randperm(num_patches)[:num_shuffle]
 
-        # 🔥 shuffle seulement entre eux
         permuted = shuffle_indices[torch.randperm(num_shuffle)]
 
         patches[shuffle_indices] = patches[permuted]
@@ -236,19 +244,6 @@ class Processor:
         return x
     
     def _high_pass_filter(self, image: Tensor, alpha=0.2) -> Tensor:
-        # blur = transforms.GaussianBlur(kernel_size=7, sigma=(0.5, 1.0))(image)
-        # image_hp = image - blur
-        
-
-        # image_hp = image_hp * alpha
-        # image_hp = torch.abs(image_hp)
-
-
-        # image_hp = (image_hp - image_hp.min()) / (image_hp.max() - image_hp.min() + 1e-8)
-
-        # image_hp = image_hp ** 0.3
-
-        # return image_hp
         blur1 = transforms.GaussianBlur(7, sigma=1.0)(image)
         blur2 = transforms.GaussianBlur(9, sigma=2.5)(image)
         blur_global = transforms.GaussianBlur(15, sigma=5.0)(image)
@@ -258,47 +253,19 @@ class Processor:
 
         enhanced = image + 1.2 * (detail1 + 0.5 * detail2)
 
-        # 🔥 suppression structure globale
         enhanced = enhanced - 0.3 * blur_global
 
-        # 🔥 non-linéarité texture
         enhanced = torch.clamp(enhanced, 0.0, 1.0)
         enhanced = enhanced ** 0.8
 
         return enhanced
     
-    def local_contrast_norm(self, image):
-        mean = image.mean(dim=(1,2), keepdim=True)
-        std = image.std(dim=(1,2), keepdim=True)
-        return (image - mean) / (std + 1e-8)
-    
-    def texture_boost(self, image, amount=1.5):
-        blur_low = transforms.GaussianBlur(11, sigma=3.0)(image)
-        blur_high = transforms.GaussianBlur(3, sigma=0.5)(image)
-
-        # band-pass = texture utile
-        texture = blur_high - blur_low
-
-        enhanced = image + amount * texture
-
-        return torch.clamp(enhanced, 0, 1)
-    
-    def local_texture_energy(self, image):
-        blur = transforms.GaussianBlur(7, sigma=2.0)(image)
-        energy = torch.abs(image - blur)
-
-        # normalisation locale
-        norm = transforms.GaussianBlur(7, sigma=2.0)(energy)
-        energy = energy / (norm + 1e-6)
-
-        return energy
     def local_contrast_norm_v2(self, image: Tensor):
         mean = image.mean(dim=(1,2), keepdim=True)
         std = image.std(dim=(1,2), keepdim=True)
 
         out = (image - mean) / (std + 1e-8)
 
-        # 🔥 accentuation non-linéaire (clé)
         out = torch.sign(out) * torch.sqrt(torch.abs(out))
 
         return out
@@ -332,24 +299,32 @@ class Processor:
             x[:, y0:y0+patch_size, x0:x0+patch_size] = 0.0
 
         return x
-    # def compute_fft_image(self, image_tensor: Tensor) -> np.ndarray:
-    #     image_np = image_tensor.mean(dim=0).cpu().numpy()
-    #     fft = np.fft.fft2(image_np)
-    #     fft_shift = np.fft.fftshift(fft)
-    #     magnitude = np.log(1 + np.abs(fft_shift))
-    #     return magnitude
     
-    def plot_deterministic_transformations(self, image_pil):
+    def compute_fft_spectrum(self, image: torch.Tensor) -> np.ndarray:
+        img = image.detach().cpu().numpy()
+        gray = img.mean(axis=0)
 
+        fft = np.fft.fft2(gray)
+        fft_shift = np.fft.fftshift(fft)
+
+        spectrum = np.log(1 + np.abs(fft_shift))
+        return spectrum
+
+    def plot_deterministic_transformations(self, image_pil):
+        """
+        Visualize transformations
+        
+        :param self: Description
+        :param image_pil: Description
+        """
         transforms_to_apply = {
             "Original": lambda x: x,
-            "Resize": transforms.Resize(224),
-            "CenterCrop": transforms.CenterCrop(224),
-            "Grayscale": transforms.Grayscale(num_output_channels=3),
-            "ColorJitter": transforms.ColorJitter(
-                brightness=0.3, contrast=0.3, saturation=0.1, hue=0.05
-            ),
-            "Pipeline_1": transforms.Compose([
+            # "Resize": transforms.Resize(224),
+            # "CenterCrop": transforms.CenterCrop(224),
+            # "Grayscale": transforms.Grayscale(num_output_channels=3),
+            # "ColorJitter": transforms.ColorJitter(
+            #     brightness=0.3, contrast=0.3, saturation=0.1, hue=0.05),
+            "Texture Transformation": transforms.Compose([
                 # transforms.ColorJitter(
                 #     brightness=0.5,
                 #     contrast=0.9,
@@ -361,27 +336,26 @@ class Processor:
                 transforms.Grayscale(num_output_channels=3),
                 transforms.ToTensor(),
                 # transforms.Lambda(lambda x: torch.clamp(x, 0, 1)),
-                transforms.Lambda(lambda x: self._high_pass_filter(x, alpha=15.0)),
-                transforms.Lambda(lambda x: self._global_patch_shuffle_partial(x, patch_size=16, shuffle_ratio=0.45)),
+                transforms.Lambda(lambda x: self._high_pass_filter(x, alpha=35.0)),
+                transforms.Lambda(lambda x: self._global_patch_shuffle_partial(x, patch_size=8, shuffle_ratio=0.4)),
                 transforms.Lambda(lambda x: self.local_contrast_norm_v2(x)),
-                transforms.Lambda(lambda x: x - 0.3 * transforms.GaussianBlur(21, sigma=5.0)(x))
-                ]
-                ),
+                transforms.Lambda(lambda x: x - 0.6 * transforms.GaussianBlur(21, sigma=5.0)(x))]),
+                
             "Pipeline_2": transforms.Compose([
     transforms.Resize(256),
     transforms.RandomResizedCrop(224, scale=(0.6, 1.0)),
-    transforms.Resize(98, interpolation=transforms.InterpolationMode.BILINEAR),
+    transforms.Resize(115, interpolation=transforms.InterpolationMode.BILINEAR),
     transforms.Resize(224, interpolation=transforms.InterpolationMode.BILINEAR),
     transforms.Grayscale(num_output_channels=3),
     transforms.GaussianBlur(kernel_size=7, sigma=(1.5, 2.0)),
     transforms.ToTensor(),
-    transforms.Lambda(lambda x: self.local_patch_permutation(x, patch_size=8, permute_prob=0.20)),
-    transforms.Lambda(lambda x: self.random_multi_patch_drop_single(x, drop_prob=0.1, patch_size=8)),
+    transforms.Lambda(lambda x: self.local_patch_permutation(x, patch_size=8, permute_prob=0.15)),
+    transforms.Lambda(lambda x: self.random_patch_drop_single(x, drop_prob=0.1, patch_size=8)),
+
 ])
         }
 
-        fig, axes = plt.subplots(2, len(transforms_to_apply), figsize=(15, 6))
-
+        fig, axes = plt.subplots(3, len(transforms_to_apply), figsize=(15, 9))
         for i, (name, transform) in enumerate(transforms_to_apply.items()):
             img = transform(image_pil)
 
@@ -405,108 +379,15 @@ class Processor:
             axes[1, i].set_title("Texture score")
             axes[1, i].axis("off")
 
+            spectrum = self.compute_fft_spectrum(img if isinstance(img, torch.Tensor) else img_tensor)
+
+            axes[2, i].imshow(spectrum, cmap='inferno')
+            axes[2, i].set_title("FFT spectrum")
+            axes[2, i].set_xlabel("Frequency")
+            axes[2, i].set_ylabel("Frequency")
+
         plt.tight_layout()
         plt.show()
-
-
-    # def plot_processing_example(self, original_data_dir: str, n_samples: int = 4):
-    #     original_dataset = ImageFolder(root=original_data_dir, transform=None)
-
-    #     index = random.randint(0, len(original_dataset) - 1)
-    #     image_pil, label = original_dataset[index]
-
-    #     texture_processor = Processor(mode="texture")
-    #     global_processor = Processor(mode="global", use_patch_shuffle=True)
-
-    #     fig, axes = plt.subplots(2, n_samples + 1, figsize=(15, 6))
-
-    #     # original
-    #     axes[0, 0].imshow(np.array(image_pil))
-    #     axes[0, 0].set_title("Original")
-
-    #     for i in range(n_samples):
-    #         texture_image = texture_processor(image_pil)
-    #         texture_image = self._denormalize_image(texture_image)
-    #         texture_np = texture_image.permute(1, 2, 0).cpu().numpy()
-
-    #         axes[0, i+1].imshow(texture_np)
-    #         axes[0, i+1].set_title(f"Texture {i}")
-
-    #     for i in range(n_samples):
-    #         global_image = global_processor(image_pil)
-    #         global_image = self._denormalize_image(global_image)
-    #         global_np = global_image.permute(1, 2, 0).cpu().numpy()
-
-    #         axes[1, i+1].imshow(global_np)
-    #         axes[1, i+1].set_title(f"Global {i}")
-
-    #     axes[1, 0].axis("off")
-
-    #     plt.tight_layout()
-    #     plt.show()
-
-    # def compare_pipelines(self, image_pil):
-    #     texture_processor = Processor(
-    #         mode="texture",
-    #         use_patch_shuffle=True,
-    #         use_high_pass_filter=True
-    #     )
-
-    #     global_processor = Processor(
-    #         mode="global"
-    #     )
-
-    #     def apply_pipeline(processor, image):
-    #         outputs = []
-    #         current = image
-
-    #         outputs.append(("Original", np.array(current)))
-
-    #         for transform in processor.transforms_list:
-    #             current = transform(current)
-
-    #             name = transform.__class__.__name__
-
-    #             if isinstance(current, torch.Tensor):
-    #                 img = current.clone()
-
-    #                 # On dénormalise seulement si on vient de passer Normalize
-    #                 if isinstance(transform, transforms.Normalize):
-    #                     img = processor._denormalize_image(img)
-
-    #                 img = img.permute(1, 2, 0).cpu().numpy()
-    #                 img = np.clip(img, 0, 1)
-    #             else:
-    #                 img = np.array(current)
-
-    #             outputs.append((name, img))
-
-    #         return outputs
-
-    #     texture_outputs = apply_pipeline(texture_processor, image_pil)
-    #     global_outputs = apply_pipeline(global_processor, image_pil)
-
-    #     n = max(len(texture_outputs), len(global_outputs))
-
-    #     fig, axes = plt.subplots(2, n, figsize=(4*n, 8))
-
-    #     for i in range(n):
-    #         if i < len(texture_outputs):
-    #             name, img = texture_outputs[i]
-    #             axes[0, i].imshow(img)
-    #             axes[0, i].set_title(f"Texture: {name}")
-    #         axes[0, i].axis("off")
-
-    #         if i < len(global_outputs):
-    #             name, img = global_outputs[i]
-    #             axes[1, i].imshow(img)
-    #             axes[1, i].set_title(f"Global: {name}")
-    #         axes[1, i].axis("off")
-
-    #     plt.tight_layout()
-    #     plt.show()
-
-
 
 
 if __name__ == "__main__":
@@ -514,13 +395,8 @@ if __name__ == "__main__":
     processor = Processor(mode="global", use_patch_shuffle=True)
     # processor.plot_processing_example(original_data_dir=data_dir)
     dataset = ImageFolder(data_dir, transform=None)
-    image, _ = dataset[501]
+    image, label = dataset[502]
+    # print(image)
 
     processor.plot_deterministic_transformations(image)
 
-    # processor.compare_pipelines(image)
-    # processor = Processor(mode="texture")
-    # texture_dataset, global_dataset = Processor.create_datasets(data_dir=data_dir)
-    # processor.plot_processing_example(original_data_dir=data_dir, texture_dataset=texture_dataset, global_dataset=global_dataset)
-    # # frequencies = processor.get_datasets_frequencies({"texture": texture_dataset, "global": global_dataset})
-    # print(frequencies)

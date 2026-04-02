@@ -11,6 +11,9 @@ import multiprocessing
 multiprocessing.set_start_method("fork", force=True)
 
 class DataBuilder:
+    """
+    Class for datasets generation with transformations
+    """
 
     def __init__(self, data_dir: str, batch_size: int = 32, train_size: float = 0.8, val_size: float = 0.1, test_size: float = 0.1, seed: int = 42, sample_size: int | None = None, sample_ratio: float | None = None 
 ):

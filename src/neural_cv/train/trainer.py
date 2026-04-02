@@ -162,7 +162,7 @@ class Trainer:
 
         plt.figure(figsize=(12, 5))
 
-        # 🔹 Loss
+        #Loss
         plt.subplot(1, 2, 1)
         plt.plot(epochs, self.history["train_loss"], label="Train Loss")
         plt.plot(epochs, self.history["val_loss"], label="Val Loss")
@@ -171,7 +171,7 @@ class Trainer:
         plt.ylabel("Loss")
         plt.legend()
 
-        # 🔹 Accuracy / F1
+        #Accuracy / F1
         plt.subplot(1, 2, 2)
         plt.plot(epochs, self.history["val_accuracy"], label="Val Accuracy")
         plt.plot(epochs, self.history["val_f1"], label="Val F1")
@@ -182,7 +182,6 @@ class Trainer:
 
         plt.tight_layout()
 
-        # 🔥 sauvegarde
         plt.savefig(self.output_dir / "training_curves.png")
         plt.close()
     
