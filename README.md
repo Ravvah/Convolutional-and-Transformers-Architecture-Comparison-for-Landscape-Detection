@@ -13,5 +13,10 @@ curl -Ls https://astral.sh/uv/install.sh | sh
 
 # 3. Créer l'environnement + installer les dépendances
 ```python
+#creer le venv
+uv venv
+#activer le venv
+source .venv/bin/activate
+#installer les dépendances
 uv sync
 ```
